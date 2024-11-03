@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from StationTime import StationTime as Station
 import requests
 import time
+from datetime import datetime
 
 # A list of all the station in the WAMATA network with their attached web address ends
 station_lst = {
@@ -121,6 +122,7 @@ for stop in station_lst:
 
 
 # This code runs for 3600s (1hr) gathering data
+output_filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_wama.csv"
 end_time = time.time()+3600
 while time.time() < end_time:
     for i, entity in enumerate(station_lst):
@@ -166,8 +168,9 @@ while time.time() < end_time:
         obj_lst[i].difference(station)
 
 # Prints all of the stations and the corresponding datapoints that were gathered during the trial
-for obj in obj_lst:
-    print(obj)
+with open(output_filename, "a") as csvfile:
+    for obj in obj_lst:
+        print(obj, file=csvfile)
 
 # Closes the webdriver
 driver.close()
