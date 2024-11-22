@@ -6,6 +6,7 @@ from StationTime import StationTime as Station
 import requests
 import time
 from datetime import datetime
+import os
 
 # A list of all the station in the WAMATA network with their attached web address ends
 station_lst = {
@@ -109,68 +110,75 @@ station_lst = {
     'Wiehle-Reston East': '#N06|Wiehle-Reston East',
     'Woodley Park-Zoo/Adams Morgan': '#A04|Woodley Park-Zoo/Adams Morgan'
 }
-station = {}
-obj_lst = []
 
 # Using Firefox Web Browser
-driver = webdriver.Firefox()
+op = webdriver.FirefoxOptions()
+op.add_argument('--headless')
+driver = webdriver.Firefox(options=op)
 url = 'https://www.wmata.com/js/nexttrain/nexttrain.html'
-
-# Creates a StationTime object for every station in the station_lst
-for stop in station_lst:
-    obj_lst.append(Station(stop))
 
 
 # This code runs for 3600s (1hr) gathering data
-output_filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_wama.csv"
-end_time = time.time()+3600
-while time.time() < end_time:
-    for i, entity in enumerate(station_lst):
-        # Accesses the web address of each station in station_lst
-        new_url = url + station_lst[entity]
-        driver.get(new_url)
-        platforms = driver.find_elements(By.CLASS_NAME, 'panel-col')
+for i in range(24):
+    print("Hour {0}".format(i))
 
-        # Counter for each potential platform at the station, reset
-        counter = 1
+    station = {}
+    obj_lst = []
+    # Creates a StationTime object for every station in the station_lst
+    for stop in station_lst:
+        obj_lst.append(Station(stop))
 
-        # Sleep step assures that all the data is scraped correctly (and not missed)
-        time.sleep(0.5)
+    filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_wama.csv"
+    end_time = time.time()+3600
+    while time.time() < end_time:
+        for i, entity in enumerate(station_lst):
+            # Accesses the web address of each station in station_lst
+            new_url = url + station_lst[entity]
+            driver.get(new_url)
+            platforms = driver.find_elements(By.CLASS_NAME, 'panel-col')
 
-        # Loop for each platform
-        for platform in platforms:
-            # Organizes and gathers the data
-            trains = platform.find_elements(By.CLASS_NAME, 'train-data')
-            timetable = trains[0].text.split('\n')
+            # Counter for each potential platform at the station, reset
+            counter = 1
 
-            # Assures that the data exists
-            if len(timetable[0]) > 1 and timetable[0] != '-- Data not available.':
-                # For each possible train arriving at the specified platform
-                for j,item in enumerate(timetable):
-                    raw = item.split(' ')
-                    try:
-                        raw.remove('Line')
-                    except:
-                        continue
-                    raw[0] = raw[0] + ' Line'
-                    while len(raw) != 4:
-                        destination = raw.pop(len(raw)-2)
-                        raw[2] = raw[2] + ' ' + destination
-                    timetable[j] = tuple(raw)
-            else:
-                timetable[0] = None
+            # Sleep step assures that all the data is scraped correctly (and not missed)
+            time.sleep(0.5)
 
-            # Appends the data on the next incoming train to the station tuple that was initialized above
-            station[counter] = timetable
-            counter += 1
+            # Loop for each platform
+            for platform in platforms:
+                # Organizes and gathers the data
+                trains = platform.find_elements(By.CLASS_NAME, 'train-data')
+                timetable = trains[0].text.split('\n')
 
-        # Checks to see if a train has arrived and creates a datapoint if so
-        obj_lst[i].difference(station)
+                # Assures that the data exists
+                if len(timetable[0]) > 1 and timetable[0] != '-- Data not available.':
+                    # For each possible train arriving at the specified platform
+                    for j,item in enumerate(timetable):
+                        raw = item.split(' ')
+                        try:
+                            raw.remove('Line')
+                        except:
+                            continue
+                        raw[0] = raw[0] + ' Line'
+                        while len(raw) != 4:
+                            destination = raw.pop(len(raw)-2)
+                            raw[2] = raw[2] + ' ' + destination
+                        timetable[j] = tuple(raw)
+                else:
+                    timetable[0] = None
 
-# Prints all of the stations and the corresponding datapoints that were gathered during the trial
-with open(output_filename, "a") as csvfile:
-    for obj in obj_lst:
-        print(obj, file=csvfile)
+                # Appends the data on the next incoming train to the station tuple that was initialized above
+                station[counter] = timetable
+                counter += 1
+
+            # Checks to see if a train has arrived and creates a datapoint if so
+            obj_lst[i].difference(station)
+
+    # Prints all of the stations and the corresponding datapoints that were gathered during the trial
+    output_filename = os.path.join("./output/", filename)
+    with open(output_filename, "a") as csvfile:
+        for obj in obj_lst:
+            print(obj, file=csvfile)
+    print("!")
 
 # Closes the webdriver
 driver.close()
